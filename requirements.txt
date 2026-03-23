@@ -1,0 +1,9 @@
+pandas
+datasets
+tqdm
+rdkit
+transformers
+openai
+anthropic
+matplotlib
+seaborn
