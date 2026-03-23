@@ -9,7 +9,7 @@ def query_llama3(
     prompt: str,
     model: str,
     url: str = "http://localhost:8000/v1/chat/completions",
-    temperature: float = 0.7,
+    temperature: float = 0,
     max_tokens: int = 1000,
 ) -> dict:
     """Send one prompt to the local LLaMA3 API."""
@@ -30,9 +30,7 @@ def query_llama3(
         return {"error": str(e)}
 
 
-def run_benchmark(
-    dataset_path: str, output_dir: str, model: str
-):
+def run_benchmark(dataset_path: str, output_dir: str, model: str):
     os.makedirs(output_dir, exist_ok=True)
 
     # Load dataset

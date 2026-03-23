@@ -47,7 +47,7 @@ class MSAnalysisBatchProcessor:
                 params=MessageCreateParamsNonStreaming(
                     model=model,
                     max_tokens=max_tokens,
-                    temperature=0.1,
+                    temperature=0,
                     system=self.system_prompt,
                     messages=[{"role": "user", "content": prompt}],
                 ),
@@ -243,7 +243,7 @@ class MSAnalysisBatchProcessor:
         )
 
         batch_ids = []
-        bar=tqdm(range(num_batches), mininterval=1)
+        bar = tqdm(range(num_batches), mininterval=1)
         for batch_num in bar:
             start_idx = batch_num * batch_size
             end_idx = min(start_idx + batch_size, total_prompts)
@@ -341,7 +341,7 @@ def main():
 
     # Example: Use prepared prompts
     dataset = load_dataset("json", data_files="./data/sft_dataset_full.jsonl")["train"]
-    prompts=[dataset[i]['prompt'] for i in range(len(dataset))]
+    prompts = [dataset[i]["prompt"] for i in range(len(dataset))]
     # Process in batches
     batch_ids = processor.process_batches(
         prompts=prompts,

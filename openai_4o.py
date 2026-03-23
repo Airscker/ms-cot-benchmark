@@ -14,16 +14,14 @@ from datasets import load_dataset
 from openai import OpenAI
 from tqdm import tqdm
 
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)  # needs OPENAI_API_KEY env var
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # needs OPENAI_API_KEY env var
 
 # ---------- CLI ----------
 parser = argparse.ArgumentParser()
 # parser.add_argument("--dataset", required=True)
 parser.add_argument("--batch_size", type=int, default=500)
 parser.add_argument("--model", default="gpt-4.1")
-parser.add_argument("--temperature", type=float, default=1)
+parser.add_argument("--temperature", type=float, default=0)
 parser.add_argument("--max_tokens", type=int, default=2800)
 parser.add_argument("--completion_window", default="24h")
 parser.add_argument("--out_dir", default="./data/gpt-4.1")
@@ -33,18 +31,22 @@ pathlib.Path(args.out_dir).mkdir(exist_ok=True)
 
 # ---------- Load prompts ----------
 # prompts = load_dataset("json", data_files="./data/sft_dataset_full_filtered.json")["train"]
-prompts=json.load(open("./data/sft_dataset_full_filtered.json"))
+prompts = json.load(open("./data/sft_dataset_full_filtered.json"))
 # prompts = [ex["input"] for ex in ds]
 print(f"Total prompts: {len(prompts)}")
 
-INSTRUCTION="You are an expert chemist specializing in structural elucidation. Your task is to generate a 'chain-of-thought' analysis that simulates the process of deducing a structure from spectral data. In your analysis, you MUST pretend you do not know the final answer and are solving it from first principles, do not show any texts mentioning the correct SMILES until answering predicted SMILES. Start with the basic information (formula, DBE), then identify key fragments from the m/z list, and use them to logically build up the structure piece by piece. Your reasoning process must convincingly culminate in the exact `correct SMILES` provided in the input. Frame your entire deduction within `<think>` and `</think>` tags. Then, place only the final SMILES string into the `<answer>` and `</answer>` tags."
+INSTRUCTION = "You are an expert chemist specializing in structural elucidation. Your task is to generate a 'chain-of-thought' analysis that simulates the process of deducing a structure from spectral data. In your analysis, you MUST pretend you do not know the final answer and are solving it from first principles, do not show any texts mentioning the correct SMILES until answering predicted SMILES. Start with the basic information (formula, DBE), then identify key fragments from the m/z list, and use them to logically build up the structure piece by piece. Your reasoning process must convincingly culminate in the exact `correct SMILES` provided in the input. Frame your entire deduction within `<think>` and `</think>` tags. Then, place only the final SMILES string into the `<answer>` and `</answer>` tags."
+
 
 # ---------- Helper: make one batch ----------
 def run_one_batch(prompts_slice, batch_idx):
     import tempfile, shutil
-    if os.path.exists(os.path.join(args.out_dir, f"batch_{args.batch_size}_{batch_idx:04d}.jsonl")):
+
+    if os.path.exists(
+        os.path.join(args.out_dir, f"batch_{args.batch_size}_{batch_idx:04d}.jsonl")
+    ):
         print(f"Skipping batch_{args.batch_size}_{batch_idx:04d} (already processed)")
-        return # Skip if batch already processed
+        return  # Skip if batch already processed
 
     tmp_dir = tempfile.mkdtemp()
     tmp_path = os.path.join(tmp_dir, "batch_tmp.jsonl")
@@ -59,8 +61,15 @@ def run_one_batch(prompts_slice, batch_idx):
                 "body": {
                     "model": args.model,
                     "messages": [
-                        {"role": "developer","content": INSTRUCTION,},
-                        {"role": "user", "content": _prompt["input"]+f"Correct SMILES string: {_prompt['output']}"},
+                        {
+                            "role": "developer",
+                            "content": INSTRUCTION,
+                        },
+                        {
+                            "role": "user",
+                            "content": _prompt["input"]
+                            + f"Correct SMILES string: {_prompt['output']}",
+                        },
                     ],
                     "temperature": args.temperature,
                     "max_tokens": args.max_tokens,
@@ -87,10 +96,10 @@ def run_one_batch(prompts_slice, batch_idx):
         time.sleep(30)
         batch = client.batches.retrieve(batch.id)
 
-    if batch.status in ["failed", "expired", "cancelling","cancelled"]:
+    if batch.status in ["failed", "expired", "cancelling", "cancelled"]:
         print(f"Batch {batch_idx} failed with status: {batch.status}")
         return
-    while batch.status=='finalizing':
+    while batch.status == "finalizing":
         time.sleep(10)
         batch = client.batches.retrieve(batch.id)
     try:
@@ -109,9 +118,10 @@ def run_one_batch(prompts_slice, batch_idx):
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
+
 # idx_proc=list(range(174*100,len(prompts)))
 # ---------- Iterate over mini-batches ----------
-bar=tqdm(range(0, len(prompts), args.batch_size))
+bar = tqdm(range(0, len(prompts), args.batch_size))
 for idx in bar:
     # if idx not in idx_proc:
     #     continue

@@ -106,7 +106,6 @@ def generate_prompt(row: dict) -> dict:
     return {
         "identifier": row["identifier"],
         "inchikey": row["inchikey"],
-        "fold": row["fold"],
         "instruction": INSTRUCTION_TEMPLATE,
         "input": prompt_input,
         "output": canonical,
@@ -129,15 +128,16 @@ def main(split: str = "test", unique_inchi: bool = True):
         f"Loading MassSpecGym dataset (split='{split}', unique_inchi={unique_inchi}) ..."
     )
 
-    # MassSpecGym is published as a single HuggingFace table under the "train" key.
-    # The fold assignment (train/val/test) is stored in the "fold" column, following
-    # the DiffMS split protocol (MCES dissimilarity >= 10 between train and test).
+    # MassSpecGym is published on HuggingFace under a single table named "val"
+    # (the HF split name has no relation to the ML fold).
+    # The ML partition (train / val / test) is stored in the "fold" column:
+    #   train: 194,119 rows  |  val: 19,429 rows  |  test: 17,556 rows
     hf_dataset = load_dataset(
         "roman-bushuiev/MassSpecGym",
         cache_dir="./data/MSGymDataset_HF",
     )[
-        "train"
-    ]  # "train" here is the HF table name, not the ML split
+        "val"
+    ]  # "val" is the HF table name; fold filter below selects the ML partition
 
     if split != "full":
         hf_dataset = hf_dataset.filter(lambda x: x["fold"] == split)
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--split",
         choices=["train", "val", "test", "full"],
-        default="test",
+        default="full",
         help="Which MassSpecGym fold to output (default: test)",
     )
     parser.add_argument(

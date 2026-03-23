@@ -9,7 +9,7 @@ def query_llama3(
     prompt: str,
     model: str = "meta-llama/Llama-3.3-70B-Instruct",
     url: str = "http://localhost:8000/v1/chat/completions",
-    temperature: float = 0.7,
+    temperature: float = 0,
     max_tokens: int = 1000,
 ) -> dict:
     """Send one prompt to the local LLaMA3 API."""
