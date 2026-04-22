@@ -18,24 +18,27 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # needs OPENAI_API_KEY env
 
 # ---------- CLI ----------
 parser = argparse.ArgumentParser()
-# parser.add_argument("--dataset", required=True)
+parser.add_argument("--dataset", default="./data/benchmark_dataset_full.jsonl",
+                    help="Path to a .jsonl or .json dataset file")
 parser.add_argument("--batch_size", type=int, default=500)
-parser.add_argument("--model", default="gpt-4.1")
+parser.add_argument("--model", default="gpt-4o-mini")
 parser.add_argument("--temperature", type=float, default=0)
-parser.add_argument("--max_tokens", type=int, default=2800)
+parser.add_argument("--max_tokens", type=int, default=4096)
 parser.add_argument("--completion_window", default="24h")
-parser.add_argument("--out_dir", default="./data/gpt-4.1")
+parser.add_argument("--out_dir", default="./outputs")
 args = parser.parse_args()
 
 pathlib.Path(args.out_dir).mkdir(exist_ok=True)
 
 # ---------- Load prompts ----------
-# prompts = load_dataset("json", data_files="./data/sft_dataset_full_filtered.json")["train"]
-prompts = json.load(open("./data/sft_dataset_full_filtered.json"))
-# prompts = [ex["input"] for ex in ds]
+if args.dataset.endswith(".jsonl"):
+    with open(args.dataset) as f:
+        prompts = [json.loads(line) for line in f]
+else:
+    with open(args.dataset) as f:
+        prompts = json.load(f)
 print(f"Total prompts: {len(prompts)}")
 
-INSTRUCTION = "You are an expert chemist specializing in structural elucidation. Your task is to generate a 'chain-of-thought' analysis that simulates the process of deducing a structure from spectral data. In your analysis, you MUST pretend you do not know the final answer and are solving it from first principles, do not show any texts mentioning the correct SMILES until answering predicted SMILES. Start with the basic information (formula, DBE), then identify key fragments from the m/z list, and use them to logically build up the structure piece by piece. Your reasoning process must convincingly culminate in the exact `correct SMILES` provided in the input. Frame your entire deduction within `<think>` and `</think>` tags. Then, place only the final SMILES string into the `<answer>` and `</answer>` tags."
 
 
 # ---------- Helper: make one batch ----------
@@ -62,13 +65,12 @@ def run_one_batch(prompts_slice, batch_idx):
                     "model": args.model,
                     "messages": [
                         {
-                            "role": "developer",
-                            "content": INSTRUCTION,
+                            "role": "system",
+                            "content": _prompt["instruction"],
                         },
                         {
                             "role": "user",
-                            "content": _prompt["input"]
-                            + f"Correct SMILES string: {_prompt['output']}",
+                            "content": _prompt["input"],
                         },
                     ],
                     "temperature": args.temperature,

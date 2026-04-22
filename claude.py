@@ -19,14 +19,12 @@ class MSAnalysisBatchProcessor:
             api_key (str): Your Anthropic API key
         """
         self.client = anthropic.Anthropic(api_key=api_key)
-        self.system_prompt = """You are an expert in analyzing Mass Spectra (MS) to deduce the corresponding SMILES. 
-        You will analyze MS data and provide detailed structural analysis following a specific template format."""
 
     def create_batch_requests(
         self,
-        prompts: List[str],
+        prompts: List[Dict[str, str]],
         model: str = "claude-3-5-sonnet-20241022",
-        max_tokens: int = 1000,
+        max_tokens: int = 4096,
     ) -> List[Request]:
         """
         Create batch requests from list of prompts
@@ -48,8 +46,8 @@ class MSAnalysisBatchProcessor:
                     model=model,
                     max_tokens=max_tokens,
                     temperature=0,
-                    system=self.system_prompt,
-                    messages=[{"role": "user", "content": prompt}],
+                    system=prompt["instruction"],
+                    messages=[{"role": "user", "content": prompt["input"]}],
                 ),
             )
             requests.append(request)
@@ -216,7 +214,7 @@ class MSAnalysisBatchProcessor:
 
     def process_batches(
         self,
-        prompts: List[str],
+        prompts: List[Dict[str, str]],
         batch_size: int = 50,
         output_prefix: str = "batch_results",
         model: str = "claude-3-5-sonnet-20241022",
@@ -330,24 +328,28 @@ class MSAnalysisBatchProcessor:
         return {"metadata": data["metadata"], "extracted_smiles": extracted_smiles}
 
 
-# Example usage
 def main():
-    # Initialize processor with your API key
-    # api_key = os.getenv("ANTHROPIC_API_KEY")
-    # if not api_key:
-    # raise ValueError("Please set ANTHROPIC_API_KEY environment variable")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", default="./data/benchmark_dataset_full.jsonl")
+    parser.add_argument("--model", default="claude-3-5-sonnet-20241022")
+    parser.add_argument("--batch_size", type=int, default=10)
+    parser.add_argument("--max_tokens", type=int, default=4096)
+    parser.add_argument("--out_dir", default="./benchmark/claude-3.5-sonnet-20241022")
+    args = parser.parse_args()
+
     api_key = os.getenv("ANTHROPIC_API_KEY")
     processor = MSAnalysisBatchProcessor(api_key)
 
-    # Example: Use prepared prompts
-    dataset = load_dataset("json", data_files="./data/sft_dataset_full.jsonl")["train"]
-    prompts = [dataset[i]["prompt"] for i in range(len(dataset))]
-    # Process in batches
+    with open(args.dataset) as f:
+        prompts = [json.loads(line) for line in f]
+
+    os.makedirs(args.out_dir, exist_ok=True)
     batch_ids = processor.process_batches(
         prompts=prompts,
-        batch_size=10,  # Adjust batch size as needed
-        output_prefix="./benchmark/claude-3.5-sonnet-20241022",
-        model="claude-3-5-sonnet-20241022",
+        batch_size=args.batch_size,
+        output_prefix=args.out_dir,
+        model=args.model,
         wait_for_completion=True,
     )
 

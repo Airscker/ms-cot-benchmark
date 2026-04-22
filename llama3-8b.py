@@ -1,7 +1,7 @@
 import os
 import json
+import argparse
 import requests
-from datasets import load_dataset
 from tqdm import tqdm
 
 
@@ -10,7 +10,7 @@ def query_llama3(
     model: str,
     url: str = "http://localhost:8000/v1/chat/completions",
     temperature: float = 0,
-    max_tokens: int = 1000,
+    max_tokens: int = 4096,
 ) -> dict:
     """Send one prompt to the local LLaMA3 API."""
     payload = {
@@ -30,26 +30,46 @@ def query_llama3(
         return {"error": str(e)}
 
 
-def run_benchmark(dataset_path: str, output_dir: str, model: str):
+def run_benchmark(
+    dataset_path: str,
+    output_dir: str,
+    model: str,
+    url: str = "http://localhost:8000/v1/chat/completions",
+    max_tokens: int = 4096,
+    temperature: float = 0,
+):
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load dataset
-    dataset = load_dataset("json", data_files=dataset_path)["train"]
-    prompts = [ex["prompt"] for ex in dataset]
+    with open(dataset_path) as f:
+        records = [json.loads(line) for line in f]
+
+    prompts = [ex["instruction"] + "\n" + ex["input"] for ex in records]
 
     for idx, prompt in enumerate(tqdm(prompts, desc="Running prompts")):
-        # if idx <= 8740:
-        #     continue
-        result = query_llama3(prompt, model=model)
-        # Save to JSON
         output_path = os.path.join(output_dir, f"response_{idx:05d}.json")
+        if os.path.exists(output_path):
+            continue
+        result = query_llama3(prompt, model=model, url=url,
+                               temperature=temperature, max_tokens=max_tokens)
         with open(output_path, "w") as f:
             json.dump({"index": idx, "prompt": prompt, "response": result}, f, indent=4)
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", default="./data/benchmark_dataset_full.jsonl")
+    parser.add_argument("--out_dir", default="./benchmark/Meta-Llama-3-8B-Instruct")
+    parser.add_argument("--model", default="meta-llama/Meta-Llama-3-8B-Instruct")
+    parser.add_argument("--url", default="http://localhost:8000/v1/chat/completions")
+    parser.add_argument("--max_tokens", type=int, default=4096)
+    parser.add_argument("--temperature", type=float, default=0)
+    args = parser.parse_args()
+
     run_benchmark(
-        dataset_path="./data/sft_dataset_full.jsonl",
-        output_dir="./benchmark/Meta-Llama-3-8B-Instruct",
-        model="meta-llama/Meta-Llama-3-8B-Instruct",
+        dataset_path=args.dataset,
+        output_dir=args.out_dir,
+        model=args.model,
+        url=args.url,
+        max_tokens=args.max_tokens,
+        temperature=args.temperature,
     )
