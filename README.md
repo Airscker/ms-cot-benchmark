@@ -39,7 +39,7 @@ Run the generation script for the desired model. For example, to evaluate GPT-4o
 
 ```bash
 export OPENAI_API_KEY="your-api-key"
-python openai_4o.py --dataset data/benchmark_dataset_test.jsonl
+python openai_4o.py --dataset ./data/benchmark_dataset_full.jsonl --model gpt-4o-mini --out_dir ./outputs
 ```
 Outputs will be saved as JSON lines containing the model's `<think>` trajectories and `<answer>` fields.
 
